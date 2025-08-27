@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#007bff" />
+    <meta name="description" content="ระบบร้านออนไลน์ขนาดเล็ก รองรับการชำระเงินด้วย QR PromptPay" />
+    <meta name="keywords" content="ร้านออนไลน์, QR PromptPay, ชำระเงิน, e-commerce" />
+    <meta name="author" content="Online Shop System" />
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="ร้านออนไลน์ - QR PromptPay" />
+    <meta property="og:description" content="ซื้อขายออนไลน์สะดวกสบาย รองรับการชำระเงินด้วย QR PromptPay" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="http://localhost:3000" />
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Simple Favicon as Data URL -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23007bff'><text x='50%25' y='50%25' dominant-baseline='central' text-anchor='middle' font-size='18'>🛍️</text></svg>">
+    
+    <title>ร้านออนไลน์ - QR PromptPay</title>
+    
+    <style>
+        /* Loading Screen */
+        #initial-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        #initial-loader .loader-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #007bff;
+        }
+        
+        #initial-loader .loader-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        
+        #initial-loader .loader-text {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Hide loader when React loads */
+        .app-loaded #initial-loader {
+            display: none;
+        }
+        
+        /* Base font family */
+        * {
+            font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <noscript>
+        <div style="padding: 2rem; text-align: center; font-family: 'Sarabun', sans-serif;">
+            <h2>เปิดใช้งาน JavaScript</h2>
+            <p>คุณต้องเปิดใช้งาน JavaScript เพื่อรันแอปพลิเคชันนี้</p>
+            <p>You need to enable JavaScript to run this app.</p>
+        </div>
+    </noscript>
+    
+    <!-- Initial Loading Screen -->
+    <div id="initial-loader">
+        <div class="loader-icon">🛍️</div>
+        <div class="loader-spinner"></div>
+        <div class="loader-text">กำลังโหลด...</div>
+    </div>
+    
+    <!-- React App Root -->
+    <div id="root"></div>
+    
+    <script>
+        // Hide loader when page is loaded
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                document.body.classList.add('app-loaded');
+            }, 500);
+        });
+        
+        // ลบ Service Worker Registration ออก
+        // เพราะไฟล์ sw.js ไม่มีจริง
+    </script>
+</body>
+</html>

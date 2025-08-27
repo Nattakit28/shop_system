@@ -1,0 +1,12 @@
+{
+  "short_name": "ร้านออนไลน์",
+  "name": "ระบบร้านออนไลน์ QR PromptPay",
+  "description": "ร้านค้าออนไลน์ขนาดเล็ก รองรับการชำระเงินด้วย QR PromptPay",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#007bff",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "th"
+}
