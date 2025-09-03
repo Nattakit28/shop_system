@@ -761,16 +761,24 @@ app.get('/api/admin/settings', authenticateAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
+  let transactionStarted = false;
   try {
-    await db.execute('START TRANSACTION');
+      await db.query('START TRANSACTION');
+    transactionStarted = true;
     for (const [key, value] of Object.entries(req.body)) {
-      await db.execute('INSERT INTO settings (setting_key, setting_value, updated_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()', [key, value]);
+      await db.execute(
+        'INSERT INTO settings (setting_key, setting_value, updated_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()',
+        [key, value]
+      );
     }
-    await db.execute('COMMIT');
+      await db.query('COMMIT');
     res.json({ success: true, message: 'Settings updated successfully' });
   } catch (error) {
-    await db.execute('ROLLBACK');
-    res.status(500).json({ message: 'Error updating settings' });
+    if (transactionStarted) {
+        await db.query('ROLLBACK');
+    }
+    console.error('❌ Error updating settings:', error); // เพิ่ม log นี้
+    res.status(500).json({ message: 'Error updating settings', error: error.message });
   }
 });
 
