@@ -6,6 +6,7 @@ const mysql = require('mysql2/promise');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const orderRoutes = require('./routes/orders');
 require('dotenv').config();
 
 const app = express();
@@ -17,8 +18,8 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', crede
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('uploads'));
+app.use('/api/orders', orderRoutes);
 
-// Create upload directories
 ['uploads/products', 'uploads/payments', 'uploads/general'].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
@@ -39,7 +40,6 @@ const dbConfig = {
 
 let db;
 
-// Database connection
 async function connectDB() {
   try {
     db = mysql.createPool(dbConfig);  // ✅ แก้ไข

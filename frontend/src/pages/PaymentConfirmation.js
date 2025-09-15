@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { orderAPI, paymentAPI } from '../services/api';
-import QRPayment from '../components/QRPayment';
-import { formatCurrency, formatDate } from '../utils/promptpay';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { orderAPI, paymentAPI } from "../services/api";
+import QRPayment from "../components/QRPayment";
+import { formatCurrency, formatDate } from "../utils/promptpay";
 
 const PaymentConfirmation = () => {
   const { orderId } = useParams();
@@ -10,9 +10,9 @@ const PaymentConfirmation = () => {
   const [order, setOrder] = useState(null);
   const [showProofForm, setShowProofForm] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
-    paymentDateTime: '',
-    notes: '',
-    paymentSlip: null
+    paymentDateTime: "",
+    notes: "",
+    paymentSlip: null,
   });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -24,8 +24,8 @@ const PaymentConfirmation = () => {
         const response = await orderAPI.getById(orderId);
         setOrder(response.data);
       } catch (error) {
-        console.error('Error fetching order:', error);
-        navigate('/');
+        console.error("Error fetching order:", error);
+        navigate("/");
       } finally {
         setLoading(false);
       }
@@ -36,78 +36,82 @@ const PaymentConfirmation = () => {
     }
   }, [orderId, navigate]);
 
+  // ✅ เพิ่มฟังก์ชัน validateForm
+  const validateForm = () => {
+    const { paymentDateTime, paymentSlip } = paymentForm;
+
+    if (!paymentDateTime || !paymentSlip) {
+      alert("กรุณากรอกข้อมูลให้ครบถ้วนและแนบสลิปการชำระเงิน");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       // Validate file type
-      if (!file.type.startsWith('image/')) {
-        alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      if (!file.type.startsWith("image/")) {
+        alert("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
         return;
       }
-      
+
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('ไฟล์มีขนาดใหญ่เกินไป (ขนาดสูงสุด 5MB)');
+        alert("ไฟล์มีขนาดใหญ่เกินไป (ขนาดสูงสุด 5MB)");
         return;
       }
-      
-      setPaymentForm(prev => ({
+
+      setPaymentForm((prev) => ({
         ...prev,
-        paymentSlip: file
+        paymentSlip: file,
       }));
     }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setPaymentForm(prev => ({
+    setPaymentForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
-  const handleSubmitProof = async (e) => {
+  // ✅ แก้ไขฟังก์ชัน handleSubmit - ลบการอ้างอิง customerInfo และ cartItems
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!paymentForm.paymentSlip) {
-      alert('กรุณาแนบสลิปการโอนเงิน');
-      return;
-    }
-    
-    if (!paymentForm.paymentDateTime) {
-      alert('กรุณาระบุวันที่และเวลาที่โอนเงิน');
+
+    if (!validateForm()) {
       return;
     }
 
     setSubmitting(true);
 
-    const formData = new FormData();
-    formData.append('orderId', orderId);
-    formData.append('paymentDateTime', paymentForm.paymentDateTime);
-    formData.append('notes', paymentForm.notes);
-    formData.append('paymentSlip', paymentForm.paymentSlip);
-
     try {
-      await paymentAPI.submitProof(formData);
-      
-      // Show success message
-      const message = document.createElement('div');
-      message.className = 'toast-message success';
-      message.textContent = 'ส่งหลักฐานการชำระเงินเรียบร้อยแล้ว!';
-      document.body.appendChild(message);
-      
-      setTimeout(() => {
-        message.remove();
-        navigate(`/thank-you/${order.order_number}`);
-      }, 2000);
-      
+      const formData = new FormData();
+      formData.append("paymentDateTime", paymentForm.paymentDateTime);
+      formData.append("notes", paymentForm.notes);
+      formData.append("paymentSlip", paymentForm.paymentSlip);
+
+      const response = await paymentAPI.submitProof(orderId, formData);
+
+      if (response.data.success) {
+        alert("ส่งหลักฐานการชำระเงินสำเร็จ!");
+        navigate("/");
+      } else {
+        alert("เกิดข้อผิดพลาด: " + (response.data.message || "Unknown error"));
+      }
     } catch (error) {
-      console.error('Payment proof submission error:', error);
-      alert('เกิดข้อผิดพลาดในการส่งหลักฐาน กรุณาลองใหม่อีกครั้ง');
+      console.error("Error submitting payment proof:", error);
+      alert("เกิดข้อผิดพลาดในการส่งหลักฐานการชำระเงิน กรุณาลองใหม่อีกครั้ง");
     } finally {
       setSubmitting(false);
     }
   };
+
+  // ✅ เพิ่มฟังก์ชัน handleSubmitProof
+  const handleSubmitProof = handleSubmit;
 
   if (loading) {
     return (
@@ -122,7 +126,7 @@ const PaymentConfirmation = () => {
     return (
       <div className="error-container">
         <div className="error-message">ไม่พบคำสั่งซื้อ</div>
-        <button onClick={() => navigate('/')} className="btn btn-primary">
+        <button onClick={() => navigate("/")} className="btn btn-primary">
           กลับหน้าแรก
         </button>
       </div>
@@ -138,7 +142,7 @@ const PaymentConfirmation = () => {
             <span className="status-badge pending">รอการชำระเงิน</span>
           </div>
         </div>
-        
+
         <div className="payment-content">
           {/* Order Information */}
           <div className="order-info-section">
@@ -164,7 +168,9 @@ const PaymentConfirmation = () => {
               )}
               <div className="detail-row highlight">
                 <span className="label">ยอดรวมทั้งหมด:</span>
-                <span className="value total">{formatCurrency(order.total_amount)}</span>
+                <span className="value total">
+                  {formatCurrency(order.total_amount)}
+                </span>
               </div>
               <div className="detail-row">
                 <span className="label">วันที่สั่งซื้อ:</span>
@@ -178,11 +184,13 @@ const PaymentConfirmation = () => {
 
           {/* Payment Proof Form */}
           <div className="payment-actions">
-            <button 
+            <button
               onClick={() => setShowProofForm(!showProofForm)}
-              className={`btn ${showProofForm ? 'btn-secondary' : 'btn-primary'} btn-lg`}
+              className={`btn ${
+                showProofForm ? "btn-secondary" : "btn-primary"
+              } btn-lg`}
             >
-              {showProofForm ? '🔽 ซ่อนฟอร์ม' : '📤 แจ้งการชำระเงิน'}
+              {showProofForm ? "🔽 ซ่อนฟอร์ม" : "📤 แจ้งการชำระเงิน"}
             </button>
           </div>
 
@@ -192,7 +200,7 @@ const PaymentConfirmation = () => {
               <p className="section-description">
                 กรุณาแนบสลิปการโอนเงินและระบุข้อมูลเพิ่มเติม
               </p>
-              
+
               <form onSubmit={handleSubmitProof} className="payment-proof-form">
                 <div className="form-row">
                   <div className="form-group">
@@ -223,9 +231,12 @@ const PaymentConfirmation = () => {
                     <div className="file-upload-display">
                       {paymentForm.paymentSlip ? (
                         <div className="file-preview">
-                          <span className="file-name">📎 {paymentForm.paymentSlip.name}</span>
+                          <span className="file-name">
+                            📎 {paymentForm.paymentSlip.name}
+                          </span>
                           <span className="file-size">
-                            ({Math.round(paymentForm.paymentSlip.size / 1024)} KB)
+                            ({Math.round(paymentForm.paymentSlip.size / 1024)}{" "}
+                            KB)
                           </span>
                         </div>
                       ) : (
@@ -254,15 +265,15 @@ const PaymentConfirmation = () => {
                 </div>
 
                 <div className="form-actions">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setShowProofForm(false)}
                     className="btn btn-secondary"
                   >
                     ยกเลิก
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="btn btn-primary btn-lg"
                     disabled={submitting}
                   >
@@ -272,7 +283,7 @@ const PaymentConfirmation = () => {
                         กำลังส่ง...
                       </>
                     ) : (
-                      '📤 ส่งหลักฐานการชำระเงิน'
+                      "📤 ส่งหลักฐานการชำระเงิน"
                     )}
                   </button>
                 </div>
@@ -285,7 +296,7 @@ const PaymentConfirmation = () => {
             <h3>❓ ต้องการความช่วยเหลือ?</h3>
             <div className="help-content">
               <p>
-                หากมีปัญหาในการชำระเงินหรือต้องการสอบถามข้อมูลเพิ่มเติม 
+                หากมีปัญหาในการชำระเงินหรือต้องการสอบถามข้อมูลเพิ่มเติม
                 กรุณาติดต่อเราผ่านช่องทางดังต่อไปนี้:
               </p>
               <div className="contact-methods">

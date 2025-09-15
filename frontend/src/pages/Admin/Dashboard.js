@@ -652,22 +652,21 @@ const OrderManagement = () => {
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
+    console.log("Updating order status:", { orderId, newStatus });
     try {
-      // ใช้ฟังก์ชัน console.log เพื่อจำลองการอัปเดต เนื่องจาก API ยังไม่พร้อม
-      console.log(`Updating order ${orderId} to status: ${newStatus}`);
-      
-      // อัปเดตสถานะในรายการท้องถิ่น
-      setOrders(
-        orders.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus } : order
-        )
-      );
-      showToast(
-        `อัปเดตสถานะคำสั่งซื้อเป็น "${getStatusText(newStatus)}" เรียบร้อยแล้ว`,
-        "success"
-      );
+      console.log("Updating order status:", { orderId, newStatus });
+      const response = await adminAPI.updateOrderStatus(orderId, newStatus);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to update order status"
+        );
+      }
+
+      console.log(`Order ${orderId} updated to status: ${newStatus}`);
+      // ... (อัปเดตสถานะใน state)
     } catch (error) {
-      console.error("Error updating order status:", error);
+      console.error("Error updating order status:", error.message);
       showToast("เกิดข้อผิดพลาดในการอัปเดตสถานะ", "error");
     }
   };
@@ -774,6 +773,10 @@ const OrderManagement = () => {
     setSelectedOrder(order);
     setShowOrderDetail(true);
   };
+
+  useEffect(() => {
+    console.log("[DEBUG] selectedOrder updated:", selectedOrder);
+  }, [selectedOrder]);
 
   if (loading) {
     return (
@@ -1146,10 +1149,15 @@ const OrderDetailModal = ({
 }) => {
   const [orderItems, setOrderItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(true);
+  const [currentOrder, setCurrentOrder] = useState(order);
 
   useEffect(() => {
     fetchOrderItems();
   }, []);
+
+  useEffect(() => {
+    setCurrentOrder(order);
+  }, [order]);
 
   const fetchOrderItems = async () => {
     try {
@@ -1163,7 +1171,7 @@ const OrderDetailModal = ({
           product_name: "สินค้าตัวอย่าง 1",
           product_description: "รายละเอียดสินค้า",
           quantity: 2,
-          price: 450.00
+          price: 450.0,
         },
         {
           id: 2,
@@ -1171,8 +1179,8 @@ const OrderDetailModal = ({
           product_name: "สินค้าตัวอย่าง 2",
           product_description: "รายละเอียดสินค้า",
           quantity: 1,
-          price: 890.00
-        }
+          price: 890.0,
+        },
       ];
       setOrderItems(mockItems);
     } catch (error) {
@@ -1182,7 +1190,7 @@ const OrderDetailModal = ({
     }
   };
 
-  const statusStyle = getStatusColor(order.status);
+  const statusStyle = getStatusColor(currentOrder.status);
 
   return (
     <div
@@ -1249,25 +1257,25 @@ const OrderDetailModal = ({
             <strong>เลขที่คำสั่งซื้อ:</strong>
             <br />
             <span style={{ fontFamily: "monospace", fontSize: "1.1rem" }}>
-              {order.order_number}
+              {currentOrder.order_number}
             </span>
           </div>
           <div>
             <strong>ชื่อลูกค้า:</strong>
             <br />
-            {order.customer_name}
+            {currentOrder.customer_name}
           </div>
           <div>
             <strong>เบอร์โทร:</strong>
             <br />
             <span style={{ fontFamily: "monospace" }}>
-              {order.customer_phone}
+              {currentOrder.customer_phone}
             </span>
           </div>
           <div>
             <strong>วันที่สั่ง:</strong>
             <br />
-            {formatDate(order.created_at)}
+            {formatDate(currentOrder.created_at)}
           </div>
           <div>
             <strong>สถานะ:</strong>
@@ -1282,7 +1290,7 @@ const OrderDetailModal = ({
                 fontWeight: "bold",
               }}
             >
-              {getStatusText(order.status)}
+              {getStatusText(currentOrder.status)}
             </span>
           </div>
           <div>
@@ -1295,13 +1303,13 @@ const OrderDetailModal = ({
                 color: "#059669",
               }}
             >
-              {formatCurrency(order.total_amount)}
+              {formatCurrency(currentOrder.total_amount)}
             </span>
           </div>
         </div>
 
         {/* ที่อยู่จัดส่ง */}
-        {order.customer_address && (
+        {currentOrder.customer_address && (
           <div style={{ marginBottom: "1.5rem" }}>
             <h3 style={{ marginBottom: "0.5rem" }}>ที่อยู่จัดส่ง:</h3>
             <div
@@ -1312,13 +1320,13 @@ const OrderDetailModal = ({
                 border: "1px solid #d1d5db",
               }}
             >
-              {order.customer_address}
+              {currentOrder.customer_address}
             </div>
           </div>
         )}
 
         {/* หมายเหตุ */}
-        {order.notes && (
+        {currentOrder.notes && (
           <div style={{ marginBottom: "1.5rem" }}>
             <h3 style={{ marginBottom: "0.5rem" }}>หมายเหตุ:</h3>
             <div
@@ -1329,7 +1337,7 @@ const OrderDetailModal = ({
                 border: "1px solid #fbbf24",
               }}
             >
-              {order.notes}
+              {currentOrder.notes}
             </div>
           </div>
         )}
@@ -1471,7 +1479,7 @@ const OrderDetailModal = ({
                         borderTop: "2px solid #e5e7eb",
                       }}
                     >
-                      {formatCurrency(order.total_amount)}
+                      {formatCurrency(currentOrder.total_amount)}
                     </td>
                   </tr>
                 </tfoot>
@@ -1489,12 +1497,11 @@ const OrderDetailModal = ({
             flexWrap: "wrap",
           }}
         >
-          {order.status === "pending" && (
+          {currentOrder.status === "pending" && (
             <>
               <button
                 onClick={() => {
-                  onStatusUpdate(order.id, "confirmed");
-                  onClose();
+                  onStatusUpdate(currentOrder.id, "confirmed");
                 }}
                 style={{
                   padding: "0.75rem 1.5rem",
@@ -1510,8 +1517,7 @@ const OrderDetailModal = ({
               </button>
               <button
                 onClick={() => {
-                  onStatusUpdate(order.id, "cancelled");
-                  onClose();
+                  onStatusUpdate(currentOrder.id, "cancelled");
                 }}
                 style={{
                   padding: "0.75rem 1.5rem",
@@ -1528,11 +1534,10 @@ const OrderDetailModal = ({
             </>
           )}
 
-          {order.status === "confirmed" && (
+          {currentOrder.status === "confirmed" && (
             <button
               onClick={() => {
-                onStatusUpdate(order.id, "shipped");
-                onClose();
+                onStatusUpdate(currentOrder.id, "shipped");
               }}
               style={{
                 padding: "0.75rem 1.5rem",
@@ -1548,11 +1553,10 @@ const OrderDetailModal = ({
             </button>
           )}
 
-          {order.status === "shipped" && (
+          {currentOrder.status === "shipped" && (
             <button
               onClick={() => {
-                onStatusUpdate(order.id, "completed");
-                onClose();
+                onStatusUpdate(currentOrder.id, "completed");
               }}
               style={{
                 padding: "0.75rem 1.5rem",
