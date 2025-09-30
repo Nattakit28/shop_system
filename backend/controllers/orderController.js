@@ -122,14 +122,13 @@ exports.createOrder = async (req, res) => {
 
         console.log(`✅ อัปเดตลูกค้าเดิม ID: ${customerId}`);
       } else {
-        // ✅ สร้างลูกค้าใหม่ - ใช้ชื่อคอลัมน์ที่ถูกต้อง
-        const [customerResult] = await connection.execute(
+        const[customerResult] = await connection.execute(
           `INSERT INTO customers (
             first_name, last_name, phone, email, address,
             first_order_date, last_order_date, total_orders, total_spent, 
             status, created_at, updated_at
           )
-          VALUES (?, '', ?, ?, ?, NOW(), NOW(), 1, ?, 'active', NOW(), NOW())`,
+          VALUES (?, ?, ?, ?, NOW(), NOW(), 1, ?, 'active', NOW(), NOW())`,
           [
             customerName,
             customerPhone,
@@ -203,18 +202,21 @@ exports.createOrder = async (req, res) => {
     res.status(201).json({
       success: true,
       orderId: orderId,
-      orderNumber: orderNumber,
-      totalAmount: totalAmount,
-      status: "pending",
-      customerId: customerId,
-      customerInfo: {
-        name: customerName,
-        phone: customerPhone,
-        address: customerAddress,
-        email: customerEmail,
-        notes: notes,
+      data: {
+        orderId: orderId,
+        orderNumber: orderNumber,
+        totalAmount: totalAmount,
+        status: "pending",
+        customerId: customerId,
+        customerInfo: {
+          name: customerName,
+          phone: customerPhone,
+          address: customerAddress,
+          email: customerEmail,
+          notes: notes,
+        },
+        items: orderItems,
       },
-      items: orderItems,
       message: "สร้างคำสั่งซื้อสำเร็จ",
     });
   } catch (error) {
@@ -249,9 +251,9 @@ exports.getOrderById = async (req, res) => {
         o.*, 
         c.first_name as customer_first_name,
         c.last_name as customer_last_name,
-        c.phone as customer_phone,
-        c.email as customer_email,
-        c.address as customer_address,
+        c.phone as customer_phone_from_customers,
+        c.email as customer_email_from_customers,
+        c.address as customer_address_from_customers,
         c.total_orders,
         c.total_spent
       FROM orders o 

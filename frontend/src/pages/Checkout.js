@@ -100,7 +100,6 @@ const Checkout = () => {
 
       console.log("📤 Sending order data:", orderData);
 
-      // ✅ เพิ่มการตรวจสอบ API connection
       const response = await orderAPI.create(orderData);
 
       console.log("📥 Raw Response:", response);

@@ -122,13 +122,13 @@ api.interceptors.response.use(
 // =================== API Endpoints ===================
 
 // Admin API endpoints with enhanced error handling
+// แก้ไขส่วน adminAPI
 export const adminAPI = {
   // Authentication
   login: async (credentials) => {
     try {
       const response = await api.post("/admin/login", credentials);
 
-      // Store admin data and token
       if (response.data?.token) {
         localStorage.setItem("adminToken", response.data.token);
       }
@@ -157,7 +157,7 @@ export const adminAPI = {
 
   verify: () => api.get("/admin/verify"),
 
-  // Dashboard data - ปรับปรุงให้ใช้ endpoint ใหม่
+  // Dashboard data
   getDashboardStats: async () => {
     try {
       console.log("📊 ดึงสถิติแดชบอร์ด...");
@@ -174,10 +174,48 @@ export const adminAPI = {
     try {
       console.log("📊 ดึงคำสั่งซื้อล่าสุด...");
       const response = await api.get("/admin/orders/recent");
-      console.log("✅ ดึงคำสั่งซื้อสำเร็จ:", response.data.length, "รายการ");
+      console.log(
+        "✅ ดึงคำสั่งซื้อสำเร็จ:",
+        response.data?.data?.length,
+        "รายการ"
+      );
       return response;
     } catch (error) {
       console.error("❌ ข้อผิดพลาดในการดึงคำสั่งซื้อ:", error.message);
+      throw error;
+    }
+  },
+  getAllOrders: async () => {
+    try {
+      console.log("📊 ดึงคำสั่งซื้อทั้งหมด...");
+      const response = await api.get("/admin/orders");
+
+      console.log("📥 Raw response:", response.data);
+
+      // ✅ ปรับ response format ให้เป็นมาตรฐาน
+      if (response.data && !response.data.success) {
+        // แปลง format เก่าเป็นใหม่
+        return {
+          ...response,
+          data: {
+            success: true,
+            data: response.data.orders || response.data,
+            total:
+              response.data.pagination?.total ||
+              response.data.orders?.length ||
+              0,
+          },
+        };
+      }
+
+      console.log(
+        "✅ ดึงคำสั่งซื้อทั้งหมดสำเร็จ:",
+        response.data?.data?.length,
+        "รายการ"
+      );
+      return response;
+    } catch (error) {
+      console.error("❌ ข้อผิดพลาดในการดึงคำสั่งซื้อทั้งหมด:", error.message);
       throw error;
     }
   },
@@ -186,7 +224,7 @@ export const adminAPI = {
     try {
       console.log("📊 ดึงสินค้าขายดี...");
       const response = await api.get("/admin/products/top");
-      console.log("✅ ดึงสินค้าขายดีสำเร็จ:", response.data.length, "รายการ");
+      console.log("✅ ดึงสินค้าขายดีสำเร็จ:", response.data?.length, "รายการ");
       return response;
     } catch (error) {
       console.error("❌ ข้อผิดพลาดในการดึงสินค้าขายดี:", error.message);
@@ -194,10 +232,22 @@ export const adminAPI = {
     }
   },
 
-  // Orders management
+  // ✅ Orders management - แก้ไขให้ครบถ้วน
   getOrders: (params = {}) => api.get("/admin/orders", { params }),
-  updateOrderStatus: (orderId, status) =>
-    api.patch(`/admin/orders/${orderId}/status`, { status }),
+  getAllOrders: () => api.get("/admin/orders"), // ✅ เพิ่ม method นี้
+  updateOrderStatus: async (orderId, status) => {
+    try {
+      console.log(`🔄 Updating order ${orderId} to status: ${status}`);
+      const response = await api.put(`/admin/orders/${orderId}/status`, {
+        status,
+      });
+      console.log(`✅ Order ${orderId} updated successfully`);
+      return response;
+    } catch (error) {
+      console.error(`❌ Failed to update order ${orderId}:`, error);
+      throw error;
+    }
+  },
 
   // Products management
   getProducts: (params = {}) => api.get("/admin/products", { params }),
@@ -209,13 +259,12 @@ export const adminAPI = {
   // Categories management
   getCategories: () => api.get("/admin/categories"),
 
-  // Settings management - ปรับปรุงให้มีการ Error Handling ที่ดีขึ้น
+  // Settings management
   getSettings: async () => {
     try {
       console.log("📊 ดึงการตั้งค่าร้าน...");
       const response = await api.get("/admin/settings");
 
-      // ตรวจสอบว่า response เป็น array หรือไม่
       let settingsData = [];
       if (Array.isArray(response.data)) {
         settingsData = response.data;
@@ -235,7 +284,6 @@ export const adminAPI = {
     } catch (error) {
       console.error("❌ ข้อผิดพลาดในการดึงการตั้งค่า:", error.message);
 
-      // ส่งคืน fallback data หากเกิดข้อผิดพลาด
       return {
         data: [],
         status: 200,
@@ -249,7 +297,6 @@ export const adminAPI = {
     try {
       console.log("🔄 กำลังอัปเดตการตั้งค่า:", settings);
 
-      // Validate settings before sending
       if (!settings.shop_name || !settings.promptpay_number) {
         throw new Error("กรุณาระบุชื่อร้านและหมายเลข PromptPay");
       }
@@ -260,7 +307,6 @@ export const adminAPI = {
     } catch (error) {
       console.error("❌ ข้อผิดพลาดในการอัปเดตการตั้งค่า:", error.message);
 
-      // Enhanced error message handling
       if (
         error.response &&
         error.response.data &&
@@ -286,6 +332,32 @@ export const adminAPI = {
         "Content-Type": "multipart/form-data",
       },
     });
+  },
+
+  // ✅ เพิ่ม Generic HTTP methods
+  get: (url, config = {}) => {
+    console.log(`📤 Admin GET: ${url}`);
+    return api.get(url, config);
+  },
+
+  post: (url, data = {}, config = {}) => {
+    console.log(`📤 Admin POST: ${url}`);
+    return api.post(url, data, config);
+  },
+
+  put: (url, data = {}, config = {}) => {
+    console.log(`📤 Admin PUT: ${url}`);
+    return api.put(url, data, config);
+  },
+
+  patch: (url, data = {}, config = {}) => {
+    console.log(`📤 Admin PATCH: ${url}`);
+    return api.patch(url, data, config);
+  },
+
+  delete: (url, config = {}) => {
+    console.log(`📤 Admin DELETE: ${url}`);
+    return api.delete(url, config);
   },
 
   // Legacy method for backward compatibility
@@ -358,6 +430,51 @@ export const productAPI = {
     const searchParams = { ...params, search: query };
     console.log("🔍 ค้นหาสินค้าจาก Database:", searchParams);
     return api.get("/products", { params: searchParams });
+  },
+
+  // ✅ เพิ่มฟังก์ชันใหม่สำหรับ Admin Product Management
+  getAllProducts: (params = {}) => {
+    console.log("🔍 ดึงข้อมูลสินค้าทั้งหมดสำหรับ Admin:", params);
+    return api.get("/products", { params });
+  },
+
+  createProduct: (formData) => {
+    console.log("📝 สร้างสินค้าใหม่:", formData);
+    return api.post("/products", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+
+  updateProduct: (id, formData) => {
+    console.log("✏️ อัปเดตสินค้า ID:", id);
+    return api.put(`/products/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+
+  deleteProduct: (id) => {
+    console.log("🗑️ ลบสินค้า ID:", id);
+    return api.delete(`/products/${id}`);
+  },
+
+  // Category management
+  createCategory: (data) => {
+    console.log("📝 สร้างหมวดหมู่ใหม่:", data);
+    return api.post("/products/categories", data);
+  },
+
+  updateCategory: (id, data) => {
+    console.log("✏️ อัปเดตหมวดหมู่ ID:", id);
+    return api.put(`/products/categories/${id}`, data);
+  },
+
+  deleteCategory: (id) => {
+    console.log("🗑️ ลบหมวดหมู่ ID:", id);
+    return api.delete(`/products/categories/${id}`);
   },
 };
 
