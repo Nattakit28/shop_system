@@ -16,6 +16,26 @@ const PORT = process.env.PORT || 3001;
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-this-in-production";
 
+const createDirectories = () => {
+  const requiredDirectories = [
+    path.join(__dirname, "uploads"),
+    path.join(__dirname, "uploads", "products"),
+    path.join(__dirname, "uploads", "payments"),
+    path.join(__dirname, "uploads", "general"),
+  ];
+
+  requiredDirectories.forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`📁 Created directory: ${dir}`);
+    } else {
+      console.log(`📁 Directory exists: ${dir}`);
+    }
+  });
+};
+
+createDirectories();
+
 // Middleware
 app.use(
   cors({
@@ -25,7 +45,51 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use("/uploads", express.static("uploads"));
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    const originalUrl = req.url;
+    const cleanUrl = originalUrl.split("?")[0];
+    const fullPath = path.join(__dirname, "uploads", cleanUrl);
+
+    console.log(`📷 Static file request:`, {
+      method: req.method,
+      url: req.url,
+      clean_url: cleanUrl,
+      full_path: fullPath,
+      exists: fs.existsSync(fullPath),
+    });
+
+    req.url = cleanUrl;
+
+    // ถ้าไฟล์ไม่มี แสดงข้อมูล debug
+    if (!fs.existsSync(fullPath)) {
+      console.log(`❌ File not found: ${fullPath}`);
+
+      // แสดงไฟล์ที่มีใน directory
+      const dir = path.dirname(fullPath);
+      if (fs.existsSync(dir)) {
+        const files = fs.readdirSync(dir);
+        console.log(`📁 Available files in ${dir}:`, files.slice(0, 5));
+      }
+      else {
+        console.log(`✅ File found: ${fullPath}`);
+      }
+    }
+
+    // Set headers
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); // ✅ ไม่ให้ cache
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
+    next();
+  },
+  express.static(path.join(__dirname, "uploads"))
+);
+
 app.use("/api/admin", adminRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/products", productRoutes);
@@ -52,7 +116,7 @@ const dbConfig = {
   connectionLimit: 10,
   queueLimit: 0,
   acquireTimeout: 60000,
-  multipleStatements: false
+  multipleStatements: false,
 };
 
 let db;
@@ -61,36 +125,36 @@ async function connectDB() {
   try {
     // ✅ สร้าง connection pool
     db = mysql.createPool(dbConfig);
-    
+
     // ✅ ทดสอบการเชื่อมต่อ
     const connection = await db.getConnection();
     await connection.execute("SELECT 1 as test");
     connection.release();
-    
+
     console.log("✅ Database connected successfully");
     console.log(`📊 Database: ${dbConfig.database} on ${dbConfig.host}`);
   } catch (error) {
     console.error("❌ Database connection failed:", error.message);
-    
+
     // ✅ แสดงข้อมูล debug เพิ่มเติม
     console.error("🔍 Database Config:", {
       host: dbConfig.host,
       user: dbConfig.user,
       database: dbConfig.database,
-      port: dbConfig.port || 3306
+      port: dbConfig.port || 3306,
     });
-    
+
     // ✅ ตรวจสอบสาเหตุที่เป็นไปได้
-    if (error.code === 'ECONNREFUSED') {
+    if (error.code === "ECONNREFUSED") {
       console.error("💡 แนะนำ: ตรวจสอบว่า MySQL Server ทำงานอยู่หรือไม่");
       console.error("   - XAMPP: เปิด Apache และ MySQL");
       console.error("   - หรือ: net start mysql (Windows)");
-    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+    } else if (error.code === "ER_ACCESS_DENIED_ERROR") {
       console.error("💡 แนะนำ: ตรวจสอบ username/password ใน .env");
-    } else if (error.code === 'ER_BAD_DB_ERROR') {
+    } else if (error.code === "ER_BAD_DB_ERROR") {
       console.error("💡 แนะนำ: สร้าง database 'online_shop' ใน MySQL");
     }
-    
+
     process.exit(1);
   }
 }
@@ -99,7 +163,7 @@ async function connectDB() {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const folder = req.body.folder || "general";
-    const uploadPath = `uploads/${folder}`;
+    const uploadPath = path.join(__dirname, "uploads", folder);
     if (!fs.existsSync(uploadPath))
       fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
@@ -276,6 +340,300 @@ app.get("/api/debug/tables", async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ เพิ่ม debug endpoints ก่อน API routes
+app.get("/api/debug/products", async (req, res) => {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+
+    const [products] = await connection.execute(`
+      SELECT id, name, image_url, created_at, updated_at 
+      FROM products 
+      ORDER BY updated_at DESC 
+      LIMIT 10
+    `);
+
+    const productsWithImageInfo = products.map((product) => {
+      const imageUrl = product.image_url;
+      let computedUrl = null;
+      let fileExists = false;
+
+      if (imageUrl) {
+        if (imageUrl.startsWith("http")) {
+          computedUrl = imageUrl;
+        } else if (imageUrl.startsWith("/uploads/")) {
+          computedUrl = `http://localhost:${PORT}${imageUrl}`;
+          // ตรวจสอบไฟล์จริง
+          const filePath = path.join(__dirname, imageUrl.substring(1)); // ลบ / หน้าสุด
+          fileExists = fs.existsSync(filePath);
+        } else {
+          computedUrl = `http://localhost:${PORT}/uploads/products/${imageUrl}`;
+          const filePath = path.join(
+            __dirname,
+            "uploads",
+            "products",
+            imageUrl
+          );
+          fileExists = fs.existsSync(filePath);
+        }
+      }
+
+      return {
+        id: product.id,
+        name: product.name,
+        image_url: imageUrl,
+        computed_url: computedUrl,
+        file_exists: fileExists,
+        updated_at: product.updated_at,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: productsWithImageInfo,
+      server_info: {
+        port: PORT,
+        uploads_path: path.join(__dirname, "uploads"),
+        products_path: path.join(__dirname, "uploads", "products"),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+app.get("/api/debug/uploads", (req, res) => {
+  const uploadsPath = path.join(__dirname, "uploads");
+  const productsPath = path.join(__dirname, "uploads", "products");
+
+  let uploadsExists = fs.existsSync(uploadsPath);
+  let productsExists = fs.existsSync(productsPath);
+
+  let uploadsFiles = [];
+  let productsFiles = [];
+
+  if (uploadsExists) {
+    try {
+      uploadsFiles = fs.readdirSync(uploadsPath);
+    } catch (err) {
+      uploadsFiles = [`Error: ${err.message}`];
+    }
+  }
+
+  if (productsExists) {
+    try {
+      productsFiles = fs.readdirSync(productsPath);
+    } catch (err) {
+      productsFiles = [`Error: ${err.message}`];
+    }
+  }
+
+  res.json({
+    success: true,
+    paths: {
+      uploads: {
+        path: uploadsPath,
+        exists: uploadsExists,
+        files: uploadsFiles.slice(0, 10),
+      },
+      products: {
+        path: productsPath,
+        exists: productsExists,
+        files: productsFiles.slice(0, 10),
+      },
+    },
+  });
+});
+
+app.post("/api/debug/cleanup-images", async (req, res) => {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+
+    // ดึงข้อมูลสินค้าทั้งหมดที่มี image_url
+    const [products] = await connection.execute(`
+      SELECT id, name, image_url 
+      FROM products 
+      WHERE image_url IS NOT NULL AND image_url != ''
+    `);
+
+    let updated = 0;
+    let errors = [];
+
+    for (const product of products) {
+      const imageUrl = product.image_url;
+      let filePath = null;
+
+      // สร้าง file path
+      if (imageUrl.startsWith("/uploads/")) {
+        filePath = path.join(__dirname, imageUrl.substring(1));
+      } else {
+        filePath = path.join(__dirname, "uploads", "products", imageUrl);
+      }
+
+      // ตรวจสอบว่าไฟล์มีจริงหรือไม่
+      if (!fs.existsSync(filePath)) {
+        console.log(`❌ ไฟล์ไม่พบ: ${filePath} (Product ID: ${product.id})`);
+
+        // ลบ image_url ออกจากฐานข้อมูล
+        await connection.execute(
+          "UPDATE products SET image_url = NULL WHERE id = ?",
+          [product.id]
+        );
+
+        updated++;
+        errors.push({
+          product_id: product.id,
+          product_name: product.name,
+          missing_file: imageUrl,
+        });
+      } else {
+        console.log(`✅ ไฟล์พบ: ${filePath} (Product ID: ${product.id})`);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `ทำความสะอาดเสร็จสิ้น`,
+      updated_products: updated,
+      missing_files: errors,
+    });
+  } catch (error) {
+    console.log("❌ Cleanup error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+// ✅ เพิ่ม endpoint สร้าง admin (ใช้ครั้งเดียว)
+app.post("/api/create-admin", async (req, res) => {
+  let connection;
+  try {
+    const { username = "admin", password = "admin123" } = req.body;
+
+    console.log(`🔐 Creating admin user: ${username}`);
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    connection = await mysql.createConnection(dbConfig);
+
+    // ลบ admin เดิม (ถ้ามี)
+    await connection.execute("DELETE FROM admins WHERE username = ?", [
+      username,
+    ]);
+
+    const [result] = await connection.execute(
+      "INSERT INTO admins (username, password, email, first_name, last_name, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
+      [
+        username,
+        hashedPassword,
+        "admin@shop.com",
+        "Admin",
+        "User",
+        "super_admin",
+        "active",
+      ]
+    );
+
+    console.log(
+      `✅ Created admin user: ${username} with ID: ${result.insertId}`
+    );
+
+    res.json({
+      success: true,
+      message: `สร้าง admin user สำเร็จ`,
+      username: username,
+      password: password, // แสดงเฉพาะในการสร้าง
+      id: result.insertId,
+    });
+  } catch (error) {
+    console.error("❌ Create admin error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+// API routes (existing code)
+app.use("/api/products", require("./routes/products"));
+// ... rest of routes ...
+
+// ✅ เพิ่ม endpoint ทดสอบ image โดยตรง
+app.get("/api/image-test/:filename", (req, res) => {
+  const filename = req.params.filename;
+  const imagePath = path.join(__dirname, "uploads", "products", filename);
+
+  console.log(`🔍 Testing image: ${filename}`);
+  console.log(`📁 Full path: ${imagePath}`);
+  console.log(`✅ Exists: ${fs.existsSync(imagePath)}`);
+
+  if (fs.existsSync(imagePath)) {
+    res.sendFile(imagePath);
+  } else {
+    // แสดงไฟล์ที่มีอยู่
+    const productsDir = path.join(__dirname, "uploads", "products");
+    let availableFiles = [];
+
+    if (fs.existsSync(productsDir)) {
+      availableFiles = fs.readdirSync(productsDir);
+    }
+
+    res.status(404).json({
+      error: "Image not found",
+      requested: filename,
+      path: imagePath,
+      available_files: availableFiles.slice(0, 10), // แสดง 10 ไฟล์แรก
+    });
+  }
+});
+
+// ✅ เพิ่ม endpoint ทดสอบการเข้าถึงรูปภาพโดยตรง
+app.get("/api/test/image/:filename", (req, res) => {
+  try {
+    const { filename } = req.params;
+    const imagePath = path.join(__dirname, "uploads", "products", filename);
+
+    console.log(`🔍 ทดสอบเข้าถึงรูปภาพ: ${filename}`);
+    console.log(`📁 Path: ${imagePath}`);
+    console.log(`✅ File exists: ${fs.existsSync(imagePath)}`);
+
+    if (fs.existsSync(imagePath)) {
+      res.sendFile(imagePath);
+    } else {
+      res.status(404).json({
+        success: false,
+        message: "ไม่พบรูปภาพ",
+        filename: filename,
+        path: imagePath,
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 
@@ -1150,7 +1508,6 @@ app.use("*", (req, res) => {
   });
 });
 
-// Start server
 async function startServer() {
   try {
     await connectDB();
@@ -1158,11 +1515,26 @@ async function startServer() {
       console.log(`🎉 Server running on port ${PORT}`);
       console.log(`🌐 API: http://localhost:${PORT}/api`);
       console.log(`🏥 Health: http://localhost:${PORT}/api/health`);
+      console.log(`📷 Static Files: http://localhost:${PORT}/uploads`);
       console.log(
-        `📊 Dashboard: http://localhost:${PORT}/api/admin/dashboard/stats`
+        `🔍 Debug Uploads: http://localhost:${PORT}/api/debug/uploads`
       );
-      console.log(`🔐 Admin Login: http://localhost:3000/admin/login`);
-      console.log(`👤 Customer Login: http://localhost:3000/login`);
+
+      const uploadsDir = path.join(__dirname, "uploads");
+      const productsDir = path.join(uploadsDir, "products");
+
+      console.log(`📁 Uploads directory: ${uploadsDir}`);
+      console.log(`📁 Products directory: ${productsDir}`);
+      console.log(`✅ Uploads exists: ${fs.existsSync(uploadsDir)}`);
+      console.log(`✅ Products exists: ${fs.existsSync(productsDir)}`);
+
+      if (fs.existsSync(productsDir)) {
+        const files = fs.readdirSync(productsDir);
+        console.log(`📷 Product images found: ${files.length}`);
+        if (files.length > 0) {
+          console.log(`📋 Sample files:`, files.slice(0, 3));
+        }
+      }
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

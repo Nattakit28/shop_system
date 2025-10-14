@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { adminAPI } from "../../services/api";
-// ✅ import OrderManagement component
 import OrderManagement from "./OrderManagement";
-// ✅ import ProductManagement component
 import ProductManagement from "./ProductManagement";
 
 const AdminDashboard = () => {
@@ -20,7 +18,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [adminData, setAdminData] = useState(null);
   const [shopSettings, setShopSettings] = useState({});
-  const [apiErrors, setApiErrors] = useState([]); // ✅ ติดตาม API errors
+  const [apiErrors, setApiErrors] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,7 +28,6 @@ const AdminDashboard = () => {
       return;
     }
 
-    // Get admin data from localStorage if available
     const storedAdminData = localStorage.getItem("adminData");
     if (storedAdminData) {
       try {
@@ -43,15 +40,14 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, [navigate]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      setApiErrors([]); // รีเซ็ต errors
+      setApiErrors([]);
       console.log("🔄 กำลังโหลดข้อมูลแดชบอร์ด...");
 
       const errors = [];
 
-      // ✅ Fetch dashboard stats
       try {
         const statsRes = await adminAPI.getDashboardStats();
         if (statsRes.data) {
@@ -69,13 +65,11 @@ const AdminDashboard = () => {
         });
       }
 
-      // ✅ Fetch recent orders
       try {
         const ordersRes = await adminAPI.getRecentOrders();
         if (ordersRes.data && Array.isArray(ordersRes.data)) {
           setRecentOrders(ordersRes.data.slice(0, 5));
 
-          // Calculate orders by status
           const statusCount = ordersRes.data.reduce((acc, order) => {
             acc[order.status] = (acc[order.status] || 0) + 1;
             return acc;
@@ -94,7 +88,6 @@ const AdminDashboard = () => {
         setOrdersByStatus({});
       }
 
-      // ✅ Fetch top products
       try {
         const productsRes = await adminAPI.getTopProducts();
         if (productsRes.data && Array.isArray(productsRes.data)) {
@@ -111,7 +104,6 @@ const AdminDashboard = () => {
         setTopProducts([]);
       }
 
-      // ✅ Fetch shop settings
       try {
         const settingsRes = await adminAPI.getSettings();
         if (settingsRes.data && Array.isArray(settingsRes.data)) {
@@ -128,7 +120,6 @@ const AdminDashboard = () => {
         setShopSettings({});
       }
 
-      // ✅ แสดงข้อผิดพลาดที่เกิดขึ้น
       if (errors.length > 0) {
         setApiErrors(errors);
         showToast(`API มีปัญหา: ${errors.length} รายการ`, "warning");
@@ -142,7 +133,11 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const showToast = (message, type = "info") => {
     const toast = document.createElement("div");

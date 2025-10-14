@@ -15,53 +15,11 @@ const api = axios.create({
   },
 });
 
-api.interceptors.response.use(
-  (response) => {
-    console.log("✅ API Response Success:", response);
-    return response;
-  },
-  (error) => {
-    console.error("❌ API Response Error:", error);
-    console.error("❌ Error Config:", error.config);
-    console.error("❌ Error Request:", error.request);
-    console.error("❌ Error Response:", error.response);
-    return Promise.reject(error);
-  }
-);
-
-// ✅ เพิ่ม request interceptor เพื่อดีบัก
+// ✅ รวม interceptors เดียวกัน
 api.interceptors.request.use(
   (config) => {
     console.log("📤 API Request:", config);
-    return config;
-  },
-  (error) => {
-    console.error("❌ API Request Error:", error);
-    return Promise.reject(error);
-  }
-);
 
-let isOnlineMode = true;
-
-// Test connection และ initialize API mode
-export const initializeAPI = async () => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/health`, {
-      timeout: 5000,
-    });
-    isOnlineMode = true;
-    console.log("✅ เชื่อมต่อ API สำเร็จ - โหมดออนไลน์");
-    return { success: true, mode: "online" };
-  } catch (error) {
-    isOnlineMode = false;
-    console.error("❌ เชื่อมต่อ API ล้มเหลว:", error.message);
-    return { success: false, mode: "offline", error: error.message };
-  }
-};
-
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
     const token =
       localStorage.getItem("adminToken") || localStorage.getItem("authToken");
     if (token) {
@@ -71,20 +29,25 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error("❌ API Request Error:", error);
     console.error("❌ ข้อผิดพลาดในการส่งคำขอ:", error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor with enhanced error handling
 api.interceptors.response.use(
   (response) => {
+    console.log("✅ API Response Success:", response);
     console.log(
       `📥 ได้รับการตอบกลับ: ${response.status} ${response.statusText}`
     );
     return response;
   },
   (error) => {
+    console.error("❌ API Response Error:", error);
+    console.error("❌ Error Config:", error.config);
+    console.error("❌ Error Request:", error.request);
+    console.error("❌ Error Response:", error.response);
     console.error(
       `❌ ข้อผิดพลาด API: ${error.response?.status} ${error.response?.statusText}`
     );
@@ -119,15 +82,32 @@ api.interceptors.response.use(
   }
 );
 
+let isOnlineMode = true;
+
+// Test connection และ initialize API mode
+export const initializeAPI = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/health`, {
+      timeout: 5000,
+    });
+    isOnlineMode = true;
+    console.log("✅ เชื่อมต่อ API สำเร็จ - โหมดออนไลน์");
+    return { success: true, mode: "online", data: response.data };
+  } catch (error) {
+    isOnlineMode = false;
+    console.error("❌ เชื่อมต่อ API ล้มเหลว:", error.message);
+    return { success: false, mode: "offline", error: error.message };
+  }
+};
+
 // =================== API Endpoints ===================
 
 // Admin API endpoints with enhanced error handling
-// แก้ไขส่วน adminAPI
 export const adminAPI = {
   // Authentication
   login: async (credentials) => {
     try {
-      const response = await api.post("/admin/login", credentials);
+      const response = await api.post("/auth/admin/login", credentials);
 
       if (response.data?.token) {
         localStorage.setItem("adminToken", response.data.token);
@@ -155,7 +135,7 @@ export const adminAPI = {
     return Promise.resolve();
   },
 
-  verify: () => api.get("/admin/verify"),
+  verify: () => api.get("/auth/admin/verify"),
 
   // Dashboard data
   getDashboardStats: async () => {
@@ -185,6 +165,8 @@ export const adminAPI = {
       throw error;
     }
   },
+
+  // ✅ แก้ไข duplicate key 'getAllOrders'
   getAllOrders: async () => {
     try {
       console.log("📊 ดึงคำสั่งซื้อทั้งหมด...");
@@ -232,9 +214,9 @@ export const adminAPI = {
     }
   },
 
-  // ✅ Orders management - แก้ไขให้ครบถ้วน
+  // ✅ Orders management - ลบ duplicate method
   getOrders: (params = {}) => api.get("/admin/orders", { params }),
-  getAllOrders: () => api.get("/admin/orders"), // ✅ เพิ่ม method นี้
+
   updateOrderStatus: async (orderId, status) => {
     try {
       console.log(`🔄 Updating order ${orderId} to status: ${status}`);
@@ -426,16 +408,27 @@ export const productAPI = {
     return api.get("/products/categories");
   },
 
+  getAllCategories: () => {
+    console.log("🔍 ดึงข้อมูลหมวดหมู่ทั้งหมดจาก Database");
+    return api.get("/products/categories");
+  },
+
   searchProducts: (query, params = {}) => {
     const searchParams = { ...params, search: query };
     console.log("🔍 ค้นหาสินค้าจาก Database:", searchParams);
     return api.get("/products", { params: searchParams });
   },
 
-  // ✅ เพิ่มฟังก์ชันใหม่สำหรับ Admin Product Management
-  getAllProducts: (params = {}) => {
-    console.log("🔍 ดึงข้อมูลสินค้าทั้งหมดสำหรับ Admin:", params);
-    return api.get("/products", { params });
+  getAllProducts: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.search) params.append("search", filters.search);
+    if (filters.category && filters.category !== "all")
+      params.append("category", filters.category);
+    if (filters.status && filters.status !== "all")
+      params.append("status", filters.status);
+
+    const queryString = params.toString();
+    return api.get(`/products${queryString ? `?${queryString}` : ""}`);
   },
 
   createProduct: (formData) => {
@@ -447,14 +440,22 @@ export const productAPI = {
     });
   },
 
-  updateProduct: (id, formData) => {
+  updateProduct: (id, productData) => {
     console.log("✏️ อัปเดตสินค้า ID:", id);
-    return api.put(`/products/${id}`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+
+    if (productData instanceof FormData) {
+      return api.put(`/products/${id}`, productData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+    }
+
+    return api.put(`/products/${id}`, productData);
   },
+
+  updateProductStatus: (id, statusData) =>
+    api.patch(`/products/${id}/status`, statusData),
 
   deleteProduct: (id) => {
     console.log("🗑️ ลบสินค้า ID:", id);
@@ -536,6 +537,19 @@ export const orderAPI = {
     } catch (error) {
       console.error("❌ ข้อผิดพลาดในการดึงข้อมูลคำสั่งซื้อ:", error.message);
       throw error; // ส่งต่อข้อผิดพลาดเพื่อจัดการในส่วนอื่น
+    }
+  },
+
+  // ✅ เพิ่ม getAllOrders สำหรับ orderAPI
+  getAllOrders: async () => {
+    try {
+      console.log("📊 ดึงคำสั่งซื้อทั้งหมด...");
+      const response = await api.get("/orders");
+      console.log("✅ ดึงคำสั่งซื้อทั้งหมดสำเร็จ:", response.data);
+      return response;
+    } catch (error) {
+      console.error("❌ ข้อผิดพลาดในการดึงคำสั่งซื้อทั้งหมด:", error.message);
+      throw error;
     }
   },
 };
