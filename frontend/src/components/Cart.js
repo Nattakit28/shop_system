@@ -1,33 +1,14 @@
 import React from "react";
-
-const formatCurrency = (amount) => {
-  try {
-    const numAmount = parseFloat(amount);
-
-    if (isNaN(numAmount) || numAmount === 0) {
-      return "฿0";
-    }
-
-    const formatted = numAmount.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
-
-    return `฿${formatted}`;
-  } catch (error) {
-    console.error("Error formatting currency:", error);
-    return `฿0`;
-  }
-};
+import { formatCurrency as defaultFormatCurrency } from '../utils/promptpay';
 
 const CartComponent = ({
   cartItems,
   onUpdateQuantity,
   onRemoveItem,
   showTitle = true,
-  formatCurrency: formatCurrencyProp,
+  formatCurrency: propFormatCurrency
 }) => {
-  const formatPrice = formatCurrencyProp || formatCurrency;
+  const currencyFormatter = propFormatCurrency || defaultFormatCurrency;
 
   const getTotalPrice = () => {
     return cartItems.reduce(
@@ -57,12 +38,17 @@ const CartComponent = ({
               <img
                 src={item.image_url || "/api/placeholder/80/80"}
                 alt={item.name}
+                onError={(e) => { // ✅ เพิ่ม onError handler
+                  e.target.src = "/api/placeholder/80/80";
+                }}
               />
             </div>
 
             <div className="item-details">
               <h4 className="item-name">{item.name}</h4>
-              <p className="item-price">{formatPrice(item.price)}</p>
+              <div className="item-price">
+                {currencyFormatter(item.price)} / ชิ้น
+              </div>
             </div>
 
             <div className="quantity-controls">
@@ -83,7 +69,7 @@ const CartComponent = ({
             </div>
 
             <div className="item-total">
-              {formatCurrency(item.price * item.quantity)}
+              {currencyFormatter(item.price * item.quantity)}
             </div>
 
             <button
@@ -110,7 +96,7 @@ const CartComponent = ({
         </div>
         <div className="summary-row total">
           <span>ยอดรวมทั้งหมด:</span>
-          <span className="total-price">{formatCurrency(getTotalPrice())}</span>
+          <span className="total-price">{currencyFormatter(getTotalPrice())}</span>
         </div>
       </div>
     </div>

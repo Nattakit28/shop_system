@@ -34,19 +34,37 @@ export const validatePromptPayNumber = (number) => {
 };
 
 export const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('th-TH', {
-    style: 'currency',
-    currency: 'THB',
-    minimumFractionDigits: 0,
-  }).format(amount);
+  try {
+    const numAmount = parseFloat(amount);
+    
+    if (isNaN(numAmount)) {
+      console.warn('Invalid amount for currency formatting:', amount);
+      return '฿0';
+    }
+    
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(numAmount);
+  } catch (error) {
+    console.error('Error formatting currency:', error);
+    return '฿0';
+  }
 };
 
 export const formatDate = (date) => {
-  return new Intl.DateTimeFormat('th-TH', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(date));
+  try {
+    return new Intl.DateTimeFormat('th-TH', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(date));
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'วันที่ไม่ถูกต้อง';
+  }
 };
