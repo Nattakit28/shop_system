@@ -13,6 +13,25 @@ const ProductDetail = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [toastMessage, setToastMessage] = useState("");
 
+  const formatPrice = (price) => {
+    try {
+      const formatted = formatCurrency(price);
+      if (!formatted || formatted === "NaN" || formatted === "฿NaN") {
+        console.warn(
+          "Invalid formatted price:",
+          formatted,
+          "for price:",
+          price
+        );
+        return `฿${parseFloat(price) || 0}`;
+      }
+      return formatted;
+    } catch (error) {
+      console.error("Error formatting price:", error, "for price:", price);
+      return `฿${parseFloat(price) || 0}`;
+    }
+  };
+
   // ✅ ฟังก์ชันจัดการ localStorage อย่างปลอดภัย
   const getCartFromStorage = () => {
     try {
@@ -47,7 +66,7 @@ const ProductDetail = () => {
         }
 
         const response = await productAPI.getProduct(id);
-        
+
         // ✅ จัดการ Response แบบง่าย
         let productData = response?.data;
         if (productData?.data) {
@@ -62,10 +81,9 @@ const ProductDetail = () => {
         // ✅ ลบ debug logs ที่ไม่จำเป็น
         console.log("✅ Product loaded:", productData.name);
         setProduct(productData);
-        
       } catch (err) {
         console.error("❌ Error fetching product:", err);
-        
+
         if (err.response?.status === 404) {
           setError("ไม่พบสินค้าที่ต้องการ");
         } else if (err.response?.status === 400) {
@@ -89,7 +107,7 @@ const ProductDetail = () => {
       console.error("❌ No product data");
       return;
     }
-    
+
     const stockQuantity = product.stock_quantity || 0;
     if (stockQuantity <= 0) {
       setToastMessage(`❌ สินค้า "${product.name}" หมดสต็อกแล้ว`);
@@ -99,15 +117,17 @@ const ProductDetail = () => {
 
     // ตรวจสอบในตะกร้า
     const cart = getCartFromStorage();
-    const existingItem = cart.find(item => item.id === product.id);
+    const existingItem = cart.find((item) => item.id === product.id);
     const currentInCart = existingItem ? existingItem.quantity : 0;
 
     if (currentInCart + quantity > stockQuantity) {
-      setToastMessage(`❌ ไม่สามารถเพิ่มได้ สินค้าเหลือ ${stockQuantity} ชิ้น คุณมีในตะกร้า ${currentInCart} ชิ้นแล้ว`);
+      setToastMessage(
+        `❌ ไม่สามารถเพิ่มได้ สินค้าเหลือ ${stockQuantity} ชิ้น คุณมีในตะกร้า ${currentInCart} ชิ้นแล้ว`
+      );
       setTimeout(() => setToastMessage(""), 3000);
       return;
     }
-    
+
     if (existingItem) {
       existingItem.quantity += quantity;
     } else {
@@ -116,14 +136,16 @@ const ProductDetail = () => {
         name: product.name,
         price: product.price,
         image_url: product.image_url,
-        quantity: quantity
+        quantity: quantity,
       });
     }
-    
+
     const success = setCartToStorage(cart);
-    
+
     if (success) {
-      setToastMessage(`✅ เพิ่ม ${product.name} (${quantity} ชิ้น) ลงตะกร้าแล้ว!`);
+      setToastMessage(
+        `✅ เพิ่ม ${product.name} (${quantity} ชิ้น) ลงตะกร้าแล้ว!`
+      );
       setTimeout(() => setToastMessage(""), 3000);
     } else {
       setToastMessage("❌ เกิดข้อผิดพลาดในการเพิ่มสินค้า");
@@ -139,7 +161,7 @@ const ProductDetail = () => {
   const handleQuantityChange = (newQuantity) => {
     const qty = parseInt(newQuantity);
     const maxStock = product?.stock_quantity || 0;
-    
+
     if (isNaN(qty) || qty < 1) {
       setQuantity(1);
     } else if (qty > maxStock) {
@@ -192,7 +214,7 @@ const ProductDetail = () => {
       {toastMessage && (
         <div className="toast-message success">{toastMessage}</div>
       )}
-      
+
       <div className="container">
         {/* Breadcrumb */}
         <nav className="breadcrumb">
@@ -209,8 +231,8 @@ const ProductDetail = () => {
           {/* Product Images */}
           <div className="product-images">
             <div className="main-image">
-              <img 
-                src={mockImages[selectedImage]} 
+              <img
+                src={mockImages[selectedImage]}
                 alt={product.name}
                 className="main-product-image"
                 onError={(e) => {
@@ -229,7 +251,9 @@ const ProductDetail = () => {
                   key={index}
                   src={image}
                   alt={`${product.name} ${index + 1}`}
-                  className={`thumbnail ${selectedImage === index ? 'active' : ''}`}
+                  className={`thumbnail ${
+                    selectedImage === index ? "active" : ""
+                  }`}
                   onClick={() => setSelectedImage(index)}
                   onError={(e) => {
                     e.target.src = "/api/placeholder/400/400";
@@ -238,39 +262,47 @@ const ProductDetail = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Product Info */}
           <div className="product-info">
             <div className="product-header">
               <h1 className="product-title">{product.name}</h1>
               <div className="product-meta">
-                <span className="category">หมวดหมู่: {product.category_name}</span>
+                <span className="category">
+                  หมวดหมู่: {product.category_name}
+                </span>
                 <span className="product-id">รหัสสินค้า: #{product.id}</span>
               </div>
             </div>
 
             <div className="price-section">
-              <div className="current-price">{formatCurrency(product.price)}</div> {/* ✅ ใช้ product.price ตรงๆ */}
+              <div className="current-price">{formatPrice(product.price)}</div>{" "}
               <div className="stock-info">
-                <span className={`stock-status ${isOutOfStock ? 'out-of-stock' : 'in-stock'}`}>
-                  {isOutOfStock ? '❌ สินค้าหมด' : `✅ คงเหลือ ${product.stock_quantity || 0} ชิ้น`}
+                <span
+                  className={`stock-status ${
+                    isOutOfStock ? "out-of-stock" : "in-stock"
+                  }`}
+                >
+                  {isOutOfStock
+                    ? "❌ สินค้าหมด"
+                    : `✅ คงเหลือ ${product.stock_quantity || 0} ชิ้น`}
                 </span>
               </div>
             </div>
-            
+
             <div className="product-description">
               <h3>📝 รายละเอียดสินค้า</h3>
               <div className="description-content">
-                {product.description || 'ไม่มีรายละเอียดสินค้า'}
+                {product.description || "ไม่มีรายละเอียดสินค้า"}
               </div>
             </div>
-            
+
             {!isOutOfStock && (
               <div className="purchase-section">
                 <div className="quantity-section">
                   <label>จำนวน:</label>
                   <div className="quantity-controls">
-                    <button 
+                    <button
                       className="quantity-btn minus"
                       onClick={() => handleQuantityChange(quantity - 1)}
                       disabled={quantity <= 1}
@@ -285,7 +317,7 @@ const ProductDetail = () => {
                       max={product.stock_quantity}
                       className="quantity-input"
                     />
-                    <button 
+                    <button
                       className="quantity-btn plus"
                       onClick={() => handleQuantityChange(quantity + 1)}
                       disabled={quantity >= product.stock_quantity}
@@ -298,21 +330,19 @@ const ProductDetail = () => {
                 <div className="total-price">
                   <span>ราคารวม: </span>
                   <span className="total-amount">
-                    {formatCurrency(product.price * quantity)} {/* ✅ ใช้ product.price ตรงๆ */}
+                    {formatPrice(product.price * quantity)}
+                    {/* ✅ ใช้ product.price ตรงๆ */}
                   </span>
                 </div>
-                
+
                 <div className="action-buttons">
-                  <button 
+                  <button
                     onClick={addToCart}
                     className="btn btn-secondary btn-lg"
                   >
                     🛒 เพิ่มลงตะกร้า
                   </button>
-                  <button 
-                    onClick={buyNow}
-                    className="btn btn-primary btn-lg"
-                  >
+                  <button onClick={buyNow} className="btn btn-primary btn-lg">
                     💳 ซื้อทันที
                   </button>
                 </div>

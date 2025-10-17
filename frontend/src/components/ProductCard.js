@@ -7,6 +7,37 @@ const ProductCard = ({ product, onAddToCart }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
+  const formatPrice = (price) => {
+    try {
+      const formatted = formatCurrency(price);
+      if (!formatted || formatted === "NaN" || formatted === "฿NaN") {
+        console.warn(
+          "Invalid formatted price:",
+          formatted,
+          "for price:",
+          price
+        );
+        return `฿${parseFloat(price) || 0}`;
+      }
+      return formatted;
+    } catch (error) {
+      console.error("Error formatting price:", error, "for price:", price);
+      return `฿${parseFloat(price) || 0}`;
+    }
+  };
+
+  if (!product || !product.id) {
+    return (
+      <div className="product-card error-card">
+        <div className="product-info">
+          <div className="error-message">
+            <span>❌ ข้อมูลสินค้าไม่ถูกต้อง</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleImageLoad = () => setImageLoading(false);
   const handleImageError = () => {
     setImageError(true);
@@ -26,7 +57,10 @@ const ProductCard = ({ product, onAddToCart }) => {
   };
 
   // ✅ ตรวจสอบสต็อก
-  const stockQuantity = product.stock_quantity || 0;
+  const productName = product.name || "ไม่ระบุชื่อสินค้า";
+  const productPrice = parseFloat(product.price) || 0;
+  const stockQuantity = parseInt(product.stock_quantity) || 0;
+  const categoryName = product.category_name || "";
   const isOutOfStock = stockQuantity <= 0;
   const isLowStock = stockQuantity > 0 && stockQuantity <= 5;
 
@@ -85,10 +119,12 @@ const ProductCard = ({ product, onAddToCart }) => {
 
       {/* Product Info */}
       <div className="product-info">
-        <h3 className="product-name">{product.name}</h3>
+        <h3 className="product-name" title={productName}>
+          {productName}
+        </h3>
 
         <div className="product-details">
-          <div className="product-price">{formatCurrency(product.price)}</div>
+          <div className="product-price">{formatPrice(productPrice)}</div>
 
           {/* ✅ แสดงจำนวนสต็อก */}
           <div className="product-stock">
@@ -105,8 +141,10 @@ const ProductCard = ({ product, onAddToCart }) => {
             )}
           </div>
 
-          {product.category_name && (
-            <div className="product-category">📂 {product.category_name}</div>
+          {categoryName && (
+            <div className="product-category" title={categoryName}>
+              📂 {categoryName}
+            </div>
           )}
         </div>
 
