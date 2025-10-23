@@ -11,7 +11,11 @@ const ProductDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [imageError, setImageError] = useState(false); // ✅ เพิ่ม state นี้
   const [toastMessage, setToastMessage] = useState("");
+
+  // ✅ เพิ่ม DEFAULT_IMAGE
+  const DEFAULT_IMAGE = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSIjRjhGOUZBIi8+CjxwYXRoIGQ9Ik0xMDAgMTAwSDMwMFYzMDBIMTAwVjEwMFoiIHN0cm9rZT0iI0RERERERCIgc3Ryb2tlLXdpZHRoPSIyIiBmaWxsPSJub25lIi8+CjxjaXJjbGUgY3g9IjE1MCIgY3k9IjE3MCIgcj0iMjAiIGZpbGw9IiNEREREREQiLz4KPHBhdGggZD0iTTEzMCAyMDBMMTcwIDI0MEwyMzAgMTgwTDI3MCAyMjBWMjgwSDEzMFYyMDBaIiBmaWxsPSIjRERERUREIi8+Cjx0ZXh0IHg9IjIwMCIgeT0iMjIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5OTk5IiBmb250LXNpemU9IjE0Ij7guYTguKHguYjguKHguLXguYTguJ/guKXguYzguKPguLnguJc8L3RleHQ+Cjwvc3ZnPgo=";
 
   const formatPrice = (price) => {
     try {
@@ -31,6 +35,33 @@ const ProductDetail = () => {
       return `฿${parseFloat(price) || 0}`;
     }
   };
+
+  // ✅ เพิ่มฟังก์ชัน getImageUrl
+  const getImageUrl = () => {
+    if (imageError || !product?.image_url) {
+      return DEFAULT_IMAGE;
+    }
+
+    if (product.image_url.startsWith("http")) {
+      return product.image_url;
+    }
+
+    return `http://localhost:3001${product.image_url}`;
+  };
+
+  // ✅ เพิ่มฟังก์ชัน getProductImages
+  const getProductImages = () => {
+    const baseImage = getImageUrl();
+    return [baseImage, baseImage, baseImage];
+  };
+
+  // ✅ ตัวแปรที่คำนวณ
+  const stockQuantity = parseInt(product?.stock_quantity) || 0;
+  const isOutOfStock = stockQuantity <= 0;
+  const isLowStock = stockQuantity > 0 && stockQuantity <= 5;
+  const maxQuantity = Math.min(stockQuantity, 10);
+  const productImages = getProductImages();
+  const selectedQuantity = quantity; // alias สำหรับความชัดเจน
 
   // ✅ ฟังก์ชันจัดการ localStorage อย่างปลอดภัย
   const getCartFromStorage = () => {
@@ -101,15 +132,14 @@ const ProductDetail = () => {
     fetchProduct();
   }, [id]);
 
-  // ✅ ฟังก์ชัน addToCart ที่เรียบง่าย
-  const addToCart = () => {
+  // ✅ ฟังก์ชัน handleAddToCart ที่เรียบง่าย
+  const handleAddToCart = () => {
     if (!product) {
       console.error("❌ No product data");
       return;
     }
 
-    const stockQuantity = product.stock_quantity || 0;
-    if (stockQuantity <= 0) {
+    if (isOutOfStock) {
       setToastMessage(`❌ สินค้า "${product.name}" หมดสต็อกแล้ว`);
       setTimeout(() => setToastMessage(""), 3000);
       return;
@@ -153,24 +183,29 @@ const ProductDetail = () => {
     }
   };
 
-  const buyNow = () => {
-    addToCart();
-    navigate("/cart");
+  // ✅ ฟังก์ชันจัดการปริมาณ
+  const setSelectedQuantity = (newQuantity) => {
+    setQuantity(newQuantity);
   };
 
   const handleQuantityChange = (newQuantity) => {
     const qty = parseInt(newQuantity);
-    const maxStock = product?.stock_quantity || 0;
 
     if (isNaN(qty) || qty < 1) {
       setQuantity(1);
-    } else if (qty > maxStock) {
-      setQuantity(maxStock);
+    } else if (qty > maxQuantity) {
+      setQuantity(maxQuantity);
     } else {
       setQuantity(qty);
     }
   };
 
+  const buyNow = () => {
+    handleAddToCart();
+    navigate("/cart");
+  };
+
+  // ✅ Loading state
   if (loading) {
     return (
       <div className="container">
@@ -182,6 +217,7 @@ const ProductDetail = () => {
     );
   }
 
+  // ✅ Error state
   if (error || !product) {
     return (
       <div className="container">
@@ -201,28 +237,18 @@ const ProductDetail = () => {
     );
   }
 
-  const isOutOfStock = (product?.stock_quantity || 0) === 0;
-  const mockImages = [
-    product.image_url || "/api/placeholder/400/400",
-    "/api/placeholder/400/400",
-    "/api/placeholder/400/400",
-  ];
-
   return (
     <div className="product-detail">
-      {/* Toast Message */}
-      {toastMessage && (
-        <div className="toast-message success">{toastMessage}</div>
-      )}
-
       <div className="container">
         {/* Breadcrumb */}
         <nav className="breadcrumb">
-          <button onClick={() => navigate(-1)} className="back-btn">
-            ← กลับ
+          <button onClick={() => navigate("/")} className="back-btn">
+            หน้าแรก
           </button>
           <span className="breadcrumb-separator">/</span>
-          <Link to="/products">สินค้าทั้งหมด</Link>
+          <button onClick={() => navigate("/products")} className="back-btn">
+            สินค้าทั้งหมด
+          </button>
           <span className="breadcrumb-separator">/</span>
           <span className="current">{product.name}</span>
         </nav>
@@ -232,21 +258,24 @@ const ProductDetail = () => {
           <div className="product-images">
             <div className="main-image">
               <img
-                src={mockImages[selectedImage]}
+                src={getImageUrl()}
                 alt={product.name}
+                onError={() => setImageError(true)}
                 className="main-product-image"
-                onError={(e) => {
-                  e.target.src = "/api/placeholder/400/400";
-                }}
               />
+
+              {/* Stock Badge */}
               {isOutOfStock && (
-                <div className="stock-overlay">
-                  <span>สินค้าหมด</span>
-                </div>
+                <div className="stock-badge out-of-stock">หมดสต็อก</div>
+              )}
+              {isLowStock && (
+                <div className="stock-badge low-stock">เหลือน้อย</div>
               )}
             </div>
+
+            {/* Thumbnails */}
             <div className="image-thumbnails">
-              {mockImages.map((image, index) => (
+              {productImages.map((image, index) => (
                 <img
                   key={index}
                   src={image}
@@ -256,7 +285,7 @@ const ProductDetail = () => {
                   }`}
                   onClick={() => setSelectedImage(index)}
                   onError={(e) => {
-                    e.target.src = "/api/placeholder/400/400";
+                    e.target.src = DEFAULT_IMAGE;
                   }}
                 />
               ))}
@@ -267,100 +296,146 @@ const ProductDetail = () => {
           <div className="product-info">
             <div className="product-header">
               <h1 className="product-title">{product.name}</h1>
-              <div className="product-meta">
-                <span className="category">
-                  หมวดหมู่: {product.category_name}
-                </span>
-                <span className="product-id">รหัสสินค้า: #{product.id}</span>
-              </div>
+
+              {product.category_name && (
+                <div className="product-meta">
+                  <span>📂 หมวดหมู่: {product.category_name}</span>
+                </div>
+              )}
             </div>
 
             <div className="price-section">
-              <div className="current-price">{formatPrice(product.price)}</div>{" "}
-              <div className="stock-info">
-                <span
-                  className={`stock-status ${
-                    isOutOfStock ? "out-of-stock" : "in-stock"
-                  }`}
-                >
-                  {isOutOfStock
-                    ? "❌ สินค้าหมด"
-                    : `✅ คงเหลือ ${product.stock_quantity || 0} ชิ้น`}
-                </span>
-              </div>
+              <div className="current-price">{formatPrice(product.price)}</div>
             </div>
 
-            <div className="product-description">
-              <h3>📝 รายละเอียดสินค้า</h3>
-              <div className="description-content">
-                {product.description || "ไม่มีรายละเอียดสินค้า"}
-              </div>
+            {/* Stock Status */}
+            <div className="stock-info">
+              {isOutOfStock ? (
+                <div className="stock-status out-of-stock">
+                  ❌ สินค้าหมดสต็อก
+                </div>
+              ) : isLowStock ? (
+                <div className="stock-status low-stock">
+                  ⚠️ เหลือสินค้าเพียง {stockQuantity} ชิ้น
+                </div>
+              ) : (
+                <div className="stock-status in-stock">
+                  ✅ มีสินค้าในสต็อก ({stockQuantity} ชิ้น)
+                </div>
+              )}
             </div>
 
+            {/* Purchase Section */}
             {!isOutOfStock && (
               <div className="purchase-section">
                 <div className="quantity-section">
                   <label>จำนวน:</label>
                   <div className="quantity-controls">
                     <button
-                      className="quantity-btn minus"
-                      onClick={() => handleQuantityChange(quantity - 1)}
-                      disabled={quantity <= 1}
+                      className={`quantity-btn ${
+                        selectedQuantity <= 1 ? "disabled" : ""
+                      }`}
+                      onClick={() =>
+                        setSelectedQuantity(Math.max(1, selectedQuantity - 1))
+                      }
+                      disabled={selectedQuantity <= 1}
                     >
-                      −
+                      -
                     </button>
                     <input
                       type="number"
-                      value={quantity}
-                      onChange={(e) => handleQuantityChange(e.target.value)}
-                      min="1"
-                      max={product.stock_quantity}
                       className="quantity-input"
+                      value={selectedQuantity}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 1;
+                        setSelectedQuantity(
+                          Math.min(maxQuantity, Math.max(1, value))
+                        );
+                      }}
+                      min="1"
+                      max={maxQuantity}
                     />
                     <button
-                      className="quantity-btn plus"
-                      onClick={() => handleQuantityChange(quantity + 1)}
-                      disabled={quantity >= product.stock_quantity}
+                      className={`quantity-btn ${
+                        selectedQuantity >= maxQuantity ? "disabled" : ""
+                      }`}
+                      onClick={() =>
+                        setSelectedQuantity(
+                          Math.min(maxQuantity, selectedQuantity + 1)
+                        )
+                      }
+                      disabled={selectedQuantity >= maxQuantity}
                     >
                       +
                     </button>
                   </div>
+                  <small className="form-help">
+                    (สูงสุด {maxQuantity} ชิ้น)
+                  </small>
                 </div>
 
+                {/* Total Price */}
                 <div className="total-price">
-                  <span>ราคารวม: </span>
-                  <span className="total-amount">
-                    {formatPrice(product.price * quantity)}
-                    {/* ✅ ใช้ product.price ตรงๆ */}
-                  </span>
+                  <div className="label">ราคารวม:</div>
+                  <div className="total-amount">
+                    {formatPrice(product.price * selectedQuantity)}
+                  </div>
                 </div>
 
+                {/* Action Buttons */}
                 <div className="action-buttons">
                   <button
-                    onClick={addToCart}
-                    className="btn btn-secondary btn-lg"
+                    className={`btn btn-primary btn-lg ${
+                      isOutOfStock ? "btn-disabled" : ""
+                    }`}
+                    onClick={handleAddToCart}
+                    disabled={isOutOfStock}
                   >
-                    🛒 เพิ่มลงตะกร้า
+                    {isOutOfStock
+                      ? "❌ หมดสต็อก"
+                      : `🛒 เพิ่ม ${selectedQuantity} ชิ้น ลงตะกร้า`}
                   </button>
-                  <button onClick={buyNow} className="btn btn-primary btn-lg">
-                    💳 ซื้อทันที
+
+                  <button
+                    className="btn btn-secondary btn-lg"
+                    onClick={() => navigate("/cart")}
+                  >
+                    👀 ดูตะกร้าสินค้า
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Product Description */}
+            {product.description && (
+              <div className="product-description">
+                <h3>รายละเอียดสินค้า</h3>
+                <div className="description-content">
+                  <p>{product.description}</p>
                 </div>
               </div>
             )}
 
             {/* Product Features */}
             <div className="product-features">
-              <h3>✨ จุดเด่นของสินค้า</h3>
+              <h3>🔥 จุดเด่นของสินค้า</h3>
               <ul className="features-list">
+                <li>✅ สินค้าของแท้ 100%</li>
                 <li>🚚 จัดส่งฟรีทั่วประเทศ</li>
-                <li>💳 ชำระเงินผ่าน QR PromptPay</li>
-                <li>🔒 รับประกันความปลอดภัย</li>
+                <li>🔄 รับประกันคุณภาพ</li>
+                <li>💳 ชำระเงินผ่าน PromptPay</li>
                 <li>📞 บริการลูกค้า 24/7</li>
               </ul>
             </div>
           </div>
         </div>
+
+        {/* Toast Message */}
+        {toastMessage && (
+          <div className="toast-message">
+            {toastMessage}
+          </div>
+        )}
       </div>
     </div>
   );
